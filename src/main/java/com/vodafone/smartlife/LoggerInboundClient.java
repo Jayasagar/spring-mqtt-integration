@@ -18,8 +18,8 @@ import org.springframework.integration.mqtt.support.DefaultPahoMessageConverter;
 import org.springframework.integration.stream.CharacterStreamReadingMessageSource;
 import org.springframework.messaging.MessageHandler;
 
-//@SpringBootApplication
-//@IntegrationComponentScan
+@SpringBootApplication
+@IntegrationComponentScan
 public class LoggerInboundClient {
     public static void main123(String[] args) {
         SpringApplication.run(LoggerInboundClient.class, args);
