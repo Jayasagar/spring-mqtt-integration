@@ -2,19 +2,18 @@
 * __MQTT__ 
 ** Is an machine-to-machine TCP/IP connectivity protocol
 ** MQTT stands for MQ Telemetry Transport. It is a publish/subscribe, extremely simple and lightweight messaging protocol, designed for constrained devices and low-bandwidth, high-latency or unreliable networks.
-
 * __MQTT-SN__ 
 ** For non-TCP/IP protocol 
-
 * __MQTT broker__
 ** The central communication point in charge of dispaching all the messages b/w senders and the rightful receivers.
 ** The topic is the routing information for the broker
-
 * Spring has only support for MQTT 
+* http://dev.lelylan.com/api#api-physical-mqtt
 * Eclipse Paho client has only C based library for MQTT-SN. Need to write our own Java code using JNI to support MQTT-SN 
 
 ###### The Raspberry Pi
 * Raspberry Pi is a low cost, credit-card sized computer that plugs into the monitor or TV, and uses standard keyboard and mouse.
+* Example: End to End MQTT communication example: http://lelylan.github.io/lab-projects/raspberry-pi-light/
 * __Installation__
 ** Can use SD Formatter 4.0 to format the SD and copy the NOOBS Raspberry pi bootable content
 ** 
@@ -100,6 +99,7 @@ qemu-system-arm -cpu arm1176 -m 256 -M versatilepb -no-reboot -serial stdio -app
     -- Where Do I see list of defined Rules
     
 * As a Dev, I want to all the possible Configurations for MQTT clients
+* As a Dev, I want to PoC Android app with MQTT Client (Produce and Consume)
 * As a Dev, I want to implement few "Spring Integration Flows" so we can use them properly
 * As a Dev I want to have JSON Message Converter mechanism to handle after received in the MQTT client
 * As a Dev, I want to see required config / logic to message handled guarantee
@@ -112,7 +112,7 @@ qemu-system-arm -cpu arm1176 -m 256 -M versatilepb -no-reboot -serial stdio -app
 * As a Dev, I want to understand best practices to implement the MQTT clients, generic, multiple oe combination ?
 * As a Dev, Understand Can we define multiple clients per Topic
 * As a Dev, I want to see Architecture diagram for CToT-MQTT , message flow and message processing
-* 
+* As a Dev, I want to Understand on Replication, Fault tolerance, HA and Scalability from Broker point of view
 
 ###### Spring Integration
 * Channel: A medium through which a message is transmitted to its intended audience.
@@ -165,15 +165,46 @@ qemu-system-arm -cpu arm1176 -m 256 -M versatilepb -no-reboot -serial stdio -app
 
 ###### Mosquitto 
 * Open source MQTT Broker 
-* 
+* https://github.com/mqtt/mqtt.github.io/wiki/Server%20support
+
 ###### Architecture
 * __Decisions to take__
 ** One or more clients per Topic
+** Async physical flow
 ** Message contract 
-*** Format/Structure
+*** Format/Structure ?? Example: Device info ?
+*** Eg: {deviceId:, Properties: {[id: , value: expected: , pending: ],[]}}
 ** Generic MQTT client to handle all the message and distribute to the threads to process them 
 ** Separate MQTT client per Topic 
+** Understand on Replication, Fault tolerance, HA and Scalability from Broker point of view
+* References
+** https://github.com/lelylan/lelylan/
+** http://dev.lelylan.com/#overview-tutorials
+** http://lelylan.github.io/devices-dashboard-ng/index.html#/login
+** https://medium.com/@lelylan/how-to-build-an-high-availability-mqtt-cluster-for-the-internet-of-things-8011a06bd000#.g2w5mtnaj
+** 
 ![Alt Initial architecture diagram](Architecture.jpg)
+
+###### Solution Design general considerations
+* Device Topic : device/deviceId
+* CIoT Topic : device/deviceId
+* Device Properties : 
+** Value, expected and pending helps in Async communication
+** Event helps in performing the action 
+*** Example: Topic: device/DeviceId, payload property 'Event: update'
+* Async Communication: Based on Device Properties, Device or App send the Appropriate status to update the system ?
+** Example: 
+*** Mobile -> turn on light -> Publish -> (Msg Payload with Event as 'update' and Properties {value:off,Expected:on, pending:true })
+* MQTT Channel Adapter with Configuration like Topic(device/activation) and MessageConverter(JSON?) => Pub/Sub Message Channel => Message Handler => Consume CIoT Platform
+###### Setup MQTT cluster
+* 
+
+###### Parameters comes into play for MQTT Client and CIoT communication 
+* Topic Name
+* Channel Type (Point-to-Point/Pub-Sub)
+* Client need Acknowledgement back success/failure?
+* Service call to CIoT platform
+* Async physical flow
 
 ###### Incoming Message Handle Mechanism
 * Broker delivers the message to one of the topic subscriber client 
@@ -199,6 +230,34 @@ qemu-system-arm -cpu arm1176 -m 256 -M versatilepb -no-reboot -serial stdio -app
 ** Should be just a seperate threads(multiple clients) to process messages
 ** Could be a seperate module deployed in platform so that modular and independent?
 * 
+<ul><li></li></ul>
+
+###### Functional Stories and Estimation in days
+
+| Epic/Feature | No | Story | Estimation | Questions/Comments |
+|---|
+| Setup Cluster | | Setp MQTT Server/Broker |  | Setup the Load balancer, Availability, etc. DevOps/Infra team will take care |
+| Security | | SSL Communication Setup | | |
+| Security | | Authentication | | |
+| Security | | Authorization |  | | 
+| On-Board | 1.1 | Activate the Home Bridge | | <ul><li>*IoT App Work(REST call to Activate HB). Show HB info in App.</li> <li> Don't we need to notify the HB successfully setup done ? If yes, Need to consider work for App to HB communication</li></ul> |
+| On-Board | 1.2 | Add/Connect device to Home Bridge so that it can be activated | | <ul><li>Assumption, User should activate from IoT App?</li></ul> |
+| On-Board | 1.3 | Activate a device(home Sensor product) |  | <ul><li>*IoT App Work(REST call to Activate device)</li><li>Remove and Deactivate device ?</li><li>What if same devices trying to activate again ?</li></ul>  |
+| On-Board | 1.4 | List services available| | <ul><li>*IoT App Work(REST call to get all service for a device)</li></ul> |
+| On-Board | 1.5 | Add service| | <ul><li>*IoT App Work</li><li> Remove/Update Service ?</li></ul> |
+| On-Board | 1.6 | Grant read access | | <ul><li>*IoT App Work</li></ul> |
+
+| Story| Topic name | Implementation | Configuration |
+|---|
+| 1.1 | homebridge/activation  | (Only if HB and App communication required) After the successfull Activation with CIoT platform => publish(mobile app) => Sub(HB) => Ack to HB | QoS: |
+| 1.2 | device/connect | After successful discovered the device => Pub(HB) => Sub(IoT App) => Store the device info in Mobile App||
+| 1.3 | device/activation(on-board) | pub(HB) => Sub(Platform) => Convert Message => successfully activated => pub(Platform) => sub(HB) => Convert Message | QoS: |
+| 1.3(?) | device/activation(on-board) | pub(IoT App) => Sub(Platform) => Convert Message => successfully activated => pub(Platform) => sub(IoT App) => Convert Message | QoS: |
+
+###### Functional Questions 
+* Smart Watch, Fitness Band will they come into business ?
+* Why do we have Web App though we target Mobile App?
+*    
 
 ###### Eclipse IoT
 * http://iot.eclipse.org/
